@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SleepSync — Tu horario de sueño</title>
+  <style>
+    :root {
+      --bg: #080b14;
+      --surface: #0e1220;
+      --surface2: #141929;
+      --border: rgba(99, 120, 255, 0.15);
+      --accent: #6378ff;
+      --accent2: #a78bfa;
+      --accent3: #38bdf8;
+      --green: #34d399;
+      --red: #f87171;
+      --yellow: #fbbf24;
+      --text: #e2e8f0;
+      --text-muted: #64748b;
+      --text-soft: #94a3b8;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Stars background ── */
+    #stars {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .star {
+      position: absolute;
+      border-radius: 50%;
+      background: white;
+      animation: twinkle var(--d, 3s) ease-in-out infinite var(--delay, 0s);
+    }
+
+    @keyframes twinkle {
+      0%, 100% { opacity: var(--min-op, 0.2); transform: scale(1); }
+      50%       { opacity: var(--max-op, 1);   transform: scale(1.3); }
+    }
+
+    /* ── Layout ── */
+    .wrapper {
+      position: relative;
+      z-index: 1;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+    }
+
+    /* ── Header ── */
+    header {
+      text-align: center;
+      margin-bottom: 3rem;
+    }
+
+    .moon-icon {
+      font-size: 3.5rem;
+      display: block;
+      margin-bottom: 0.5rem;
+      filter: drop-shadow(0 0 20px rgba(167,139,250,0.6));
+      animation: float 4s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50%       { transform: translateY(-8px); }
+    }
+
+    header h1 {
+      font-size: clamp(2rem, 5vw, 3rem);
+      font-weight: 800;
+      background: linear-gradient(135deg, #a78bfa, #6378ff, #38bdf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      letter-spacing: -0.5px;
+    }
+
+    header p {
+      color: var(--text-muted);
+      margin-top: 0.5rem;
+      font-size: 1rem;
+    }
+
+    /* ── Tonight card ── */
+    .tonight-card {
+      background: linear-gradient(135deg, #1a1040 0%, #0e1b40 50%, #0c1a2e 100%);
+      border: 1px solid rgba(99,120,255,0.3);
+      border-radius: 24px;
+      padding: 2rem 2.5rem;
+      margin-bottom: 2.5rem;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 0 60px rgba(99,120,255,0.08);
+    }
+
+    .tonight-card::before {
+      content: '';
+      position: absolute;
+      top: -60px; right: -60px;
+      width: 200px; height: 200px;
+      background: radial-gradient(circle, rgba(167,139,250,0.12) 0%, transparent 70%);
+      border-radius: 50%;
+    }
+
+    .tonight-card .label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--accent2);
+      margin-bottom: 0.75rem;
+    }
+
+    .tonight-card .day-name {
+      font-size: 1.2rem;
+      color: var(--text-soft);
+      margin-bottom: 0.25rem;
+    }
+
+    .times-row {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+      margin-top: 1rem;
+    }
+
+    .time-block {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .time-block .t-label {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 0.2rem;
+    }
+
+    .time-block .t-value {
+      font-size: clamp(2rem, 6vw, 3.2rem);
+      font-weight: 800;
+      letter-spacing: -1px;
+      line-height: 1;
+    }
+
+    .t-value.bedtime  { color: var(--accent2); text-shadow: 0 0 30px rgba(167,139,250,0.4); }
+    .t-value.waketime { color: var(--accent3);  text-shadow: 0 0 30px rgba(56,189,248,0.4); }
+
+    .arrow-sep {
+      font-size: 1.5rem;
+      color: var(--text-muted);
+      padding-top: 1.2rem;
+    }
+
+    .sleep-info {
+      margin-top: 1.5rem;
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.35rem 0.85rem;
+      border-radius: 999px;
+      font-size: 0.82rem;
+      font-weight: 600;
+    }
+
+    .pill.green  { background: rgba(52,211,153,0.12); color: var(--green); border: 1px solid rgba(52,211,153,0.25); }
+    .pill.purple { background: rgba(167,139,250,0.12); color: var(--accent2); border: 1px solid rgba(167,139,250,0.25); }
+    .pill.blue   { background: rgba(56,189,248,0.12);  color: var(--accent3);  border: 1px solid rgba(56,189,248,0.25); }
+
+    /* ── No-schedule state ── */
+    .no-schedule {
+      text-align: center;
+      padding: 1.5rem;
+      color: var(--text-muted);
+    }
+
+    /* ── Weekly grid ── */
+    .section-title {
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 1rem;
+    }
+
+    .week-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2.5rem;
+    }
+
+    .day-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 1.25rem 1.5rem;
+      transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+      cursor: pointer;
+    }
+
+    .day-card:hover {
+      border-color: rgba(99,120,255,0.35);
+      box-shadow: 0 0 20px rgba(99,120,255,0.07);
+      transform: translateY(-2px);
+    }
+
+    .day-card.today {
+      border-color: rgba(167,139,250,0.4);
+      box-shadow: 0 0 30px rgba(167,139,250,0.08);
+    }
+
+    .day-card .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+    }
+
+    .day-card .day-label {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text-soft);
+    }
+
+    .day-card.today .day-label { color: var(--accent2); }
+
+    .today-badge {
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      background: rgba(167,139,250,0.15);
+      color: var(--accent2);
+      border: 1px solid rgba(167,139,250,0.3);
+      padding: 0.2rem 0.6rem;
+      border-radius: 999px;
+    }
+
+    .work-toggle {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.9rem;
+    }
+
+    .work-toggle label {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    /* toggle switch */
+    .toggle-wrap {
+      position: relative;
+      width: 36px;
+      height: 20px;
+    }
+
+    .toggle-wrap input { opacity: 0; width: 0; height: 0; position: absolute; }
+
+    .toggle-track {
+      position: absolute;
+      inset: 0;
+      background: var(--surface2);
+      border: 1px solid rgba(99,120,255,0.2);
+      border-radius: 999px;
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s;
+    }
+
+    .toggle-track::after {
+      content: '';
+      position: absolute;
+      top: 2px; left: 2px;
+      width: 14px; height: 14px;
+      background: var(--text-muted);
+      border-radius: 50%;
+      transition: transform 0.2s, background 0.2s;
+    }
+
+    input:checked + .toggle-track { background: rgba(99,120,255,0.2); border-color: var(--accent); }
+    input:checked + .toggle-track::after { transform: translateX(16px); background: var(--accent); }
+
+    .time-input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+
+    .time-input-group label {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      letter-spacing: 0.5px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .time-input-group input[type="time"] {
+      background: var(--surface2);
+      border: 1px solid rgba(99,120,255,0.2);
+      border-radius: 10px;
+      color: var(--text);
+      font-size: 1.5rem;
+      font-weight: 700;
+      padding: 0.5rem 0.75rem;
+      width: 100%;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      color-scheme: dark;
+      letter-spacing: 1px;
+    }
+
+    .time-input-group input[type="time"]:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(99,120,255,0.15);
+    }
+
+    .bedtime-result {
+      margin-top: 0.9rem;
+      padding: 0.75rem;
+      background: rgba(99,120,255,0.07);
+      border: 1px solid rgba(99,120,255,0.15);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .bedtime-result .br-label {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .bedtime-result .br-time {
+      font-size: 1.2rem;
+      font-weight: 800;
+      color: var(--accent2);
+    }
+
+    .no-work-msg {
+      margin-top: 0.9rem;
+      text-align: center;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      padding: 0.5rem;
+    }
+
+    /* ── Info section ── */
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 1rem;
+    }
+
+    .info-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.25rem;
+    }
+
+    .info-card .ic-icon { font-size: 1.6rem; margin-bottom: 0.5rem; }
+    .info-card .ic-title { font-size: 0.78rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0.35rem; }
+    .info-card .ic-value { font-size: 1.1rem; font-weight: 700; color: var(--text); }
+    .info-card .ic-sub   { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.2rem; }
+
+    /* ── Sleep cycles visual ── */
+    .cycles-bar {
+      display: flex;
+      gap: 4px;
+      margin-top: 0.75rem;
+    }
+
+    .cycle-seg {
+      height: 8px;
+      flex: 1;
+      border-radius: 999px;
+      background: rgba(99,120,255,0.15);
+      transition: background 0.4s;
+    }
+
+    .cycle-seg.active { background: linear-gradient(90deg, var(--accent), var(--accent2)); }
+
+    /* ── Countdown ── */
+    #countdown-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 2.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    #countdown-section .cd-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    #countdown-value {
+      font-size: 1.8rem;
+      font-weight: 800;
+      color: var(--yellow);
+      text-shadow: 0 0 20px rgba(251,191,36,0.3);
+      font-variant-numeric: tabular-nums;
+    }
+
+    #countdown-msg {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-top: 0.2rem;
+    }
+
+    footer {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      margin-top: 3rem;
+    }
+
+    @media (max-width: 480px) {
+      .times-row { gap: 1rem; }
+      .tonight-card { padding: 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="stars"></canvas>
+
+<div class="wrapper">
+  <!-- Header -->
+  <header>
+    <span class="moon-icon">🌙</span>
+    <h1>SleepSync</h1>
+    <p>Tu horario de sueño personalizado &mdash; híbrido y siempre descansado</p>
+  </header>
+
+  <!-- Tonight highlight -->
+  <div class="tonight-card" id="tonight-card">
+    <div class="label">✦ Esta noche</div>
+    <div class="day-name" id="tonight-day">—</div>
+    <div id="tonight-content">
+      <div class="no-schedule">Configura tu hora de despertar para ver tu horario de sueño.</div>
+    </div>
+  </div>
+
+  <!-- Countdown -->
+  <div id="countdown-section" style="display:none">
+    <div>
+      <div class="cd-label">⏳ Tiempo hasta dormir</div>
+      <div id="countdown-value">00:00:00</div>
+      <div id="countdown-msg"></div>
+    </div>
+    <div class="cycles-bar" id="cycles-bar">
+      <div class="cycle-seg"></div>
+      <div class="cycle-seg"></div>
+      <div class="cycle-seg"></div>
+      <div class="cycle-seg"></div>
+      <div class="cycle-seg"></div>
+    </div>
+  </div>
+
+  <!-- Weekly schedule -->
+  <div class="section-title">Horario semanal</div>
+  <div class="week-grid" id="week-grid"></div>
+
+  <!-- Info cards -->
+  <div class="section-title">Cómo funciona</div>
+  <div class="info-grid">
+    <div class="info-card">
+      <div class="ic-icon">😴</div>
+      <div class="ic-title">Sueño mínimo</div>
+      <div class="ic-value">7h 30min</div>
+      <div class="ic-sub">Recomendado por la ciencia</div>
+    </div>
+    <div class="info-card">
+      <div class="ic-icon">⏱️</div>
+      <div class="ic-title">Tiempo para dormir</div>
+      <div class="ic-value">30 min</div>
+      <div class="ic-sub">Tu tiempo promedio para quedarte dormido</div>
+    </div>
+    <div class="info-card">
+      <div class="ic-icon">🛏️</div>
+      <div class="ic-title">Total en cama</div>
+      <div class="ic-value">8h 00min</div>
+      <div class="ic-sub">Sueño + tiempo para dormir</div>
+    </div>
+    <div class="info-card">
+      <div class="ic-icon">🔄</div>
+      <div class="ic-title">Ciclos de sueño</div>
+      <div class="ic-value">5 ciclos</div>
+      <div class="ic-sub">5 × 90 min = 7h 30min</div>
+      <div class="cycles-bar" style="margin-top:0.75rem">
+        <div class="cycle-seg active"></div>
+        <div class="cycle-seg active"></div>
+        <div class="cycle-seg active"></div>
+        <div class="cycle-seg active"></div>
+        <div class="cycle-seg active"></div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    Basado en recomendaciones de la <strong>National Sleep Foundation</strong> &mdash; 7–9 horas para adultos
+  </footer>
+</div>
+
+<script>
+  // ── Stars ──────────────────────────────────────────
+  (function() {
+    const canvas = document.getElementById('stars');
+    const ctx = canvas.getContext('2d');
+    let W, H, stars = [];
+
+    function resize() {
+      W = canvas.width  = window.innerWidth;
+      H = canvas.height = window.innerHeight;
+    }
+
+    function initStars() {
+      stars = [];
+      const count = Math.floor((W * H) / 5000);
+      for (let i = 0; i < count; i++) {
+        stars.push({
+          x: Math.random() * W,
+          y: Math.random() * H,
+          r: Math.random() * 1.2 + 0.3,
+          phase: Math.random() * Math.PI * 2,
+          speed: Math.random() * 0.015 + 0.005,
+          minOp: Math.random() * 0.15 + 0.05,
+          maxOp: Math.random() * 0.5 + 0.5,
+        });
+      }
+    }
+
+    let t = 0;
+    function draw() {
+      ctx.clearRect(0, 0, W, H);
+      t += 0.016;
+      for (const s of stars) {
+        const op = s.minOp + (s.maxOp - s.minOp) * (0.5 + 0.5 * Math.sin(t * s.speed * 60 + s.phase));
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255,255,255,${op})`;
+        ctx.fill();
+      }
+      requestAnimationFrame(draw);
+    }
+
+    window.addEventListener('resize', () => { resize(); initStars(); });
+    resize(); initStars(); draw();
+  })();
+
+  // ── Config ─────────────────────────────────────────
+  const SLEEP_MIN  = 7 * 60 + 30; // 450 min
+  const FALL_ASLEEP = 30;          // min
+  const TOTAL_BED  = SLEEP_MIN + FALL_ASLEEP; // 480 min = 8h
+
+  const DAYS = [
+    { key: 'lun', name: 'Lunes',     short: 'LUN', jsDay: 1 },
+    { key: 'mar', name: 'Martes',    short: 'MAR', jsDay: 2 },
+    { key: 'mie', name: 'Miércoles', short: 'MIÉ', jsDay: 3 },
+    { key: 'jue', name: 'Jueves',    short: 'JUE', jsDay: 4 },
+    { key: 'vie', name: 'Viernes',   short: 'VIE', jsDay: 5 },
+    { key: 'sab', name: 'Sábado',    short: 'SÁB', jsDay: 6 },
+    { key: 'dom', name: 'Domingo',   short: 'DOM', jsDay: 0 },
+  ];
+
+  // ── State ──────────────────────────────────────────
+  let schedule = JSON.parse(localStorage.getItem('sleepSync_schedule') || 'null') || {};
+  // Default: Mon–Fri active
+  DAYS.forEach(d => {
+    if (!schedule[d.key]) {
+      const workDay = d.jsDay >= 1 && d.jsDay <= 5;
+      schedule[d.key] = { active: workDay, wake: workDay ? '07:00' : '09:00' };
+    }
+  });
+
+  function save() { localStorage.setItem('sleepSync_schedule', JSON.stringify(schedule)); }
+
+  function parseTime(str) {
+    const [h, m] = str.split(':').map(Number);
+    return h * 60 + m;
+  }
+
+  function formatTime(totalMin) {
+    let m = ((totalMin % 1440) + 1440) % 1440;
+    const h = Math.floor(m / 60);
+    const min = m % 60;
+    return `${String(h).padStart(2,'0')}:${String(min).padStart(2,'0')}`;
+  }
+
+  function bedtimeFor(wakeStr) {
+    const wakeMin = parseTime(wakeStr);
+    return formatTime(wakeMin - TOTAL_BED);
+  }
+
+  function todayJsDay() { return new Date().getDay(); }
+  function tomorrowJsDay() { return (new Date().getDay() + 1) % 7; }
+
+  // Tonight = the bedtime you need to go to sleep TONIGHT (for tomorrow's wake)
+  // Actually: tonight card shows today's bedtime (if today is active, you wake up today)
+  // Better UX: show the NEXT wake-up day's bedtime
+  function getNextActiveDay() {
+    const today = todayJsDay();
+    // Check today first, then cycle
+    for (let i = 0; i < 7; i++) {
+      const jsDay = (today + i) % 7;
+      const dayData = DAYS.find(d => d.jsDay === jsDay);
+      if (dayData && schedule[dayData.key]?.active) return { dayData, offsetDays: i };
+    }
+    return null;
+  }
+
+  // ── Build week grid ────────────────────────────────
+  function buildGrid() {
+    const grid = document.getElementById('week-grid');
+    const todayJs = todayJsDay();
+    grid.innerHTML = '';
+
+    DAYS.forEach(day => {
+      const s = schedule[day.key];
+      const isToday = day.jsDay === todayJs;
+      const bt = s.active ? bedtimeFor(s.wake) : null;
+
+      const card = document.createElement('div');
+      card.className = 'day-card' + (isToday ? ' today' : '');
+      card.innerHTML = `
+        <div class="card-header">
+          <div class="day-label">${day.name}</div>
+          ${isToday ? '<div class="today-badge">Hoy</div>' : ''}
+        </div>
+
+        <div class="work-toggle">
+          <div class="toggle-wrap">
+            <input type="checkbox" id="toggle-${day.key}" ${s.active ? 'checked' : ''} />
+            <label class="toggle-track" for="toggle-${day.key}"></label>
+          </div>
+          <label for="toggle-${day.key}" style="cursor:pointer; font-size:0.78rem; color:var(--text-muted)">
+            ${s.active ? 'Día activo' : 'Día libre'}
+          </label>
+        </div>
+
+        <div id="inputs-${day.key}" style="${s.active ? '' : 'display:none'}">
+          <div class="time-input-group">
+            <label>Me despierto a</label>
+            <input type="time" id="wake-${day.key}" value="${s.wake}" />
+          </div>
+          <div class="bedtime-result">
+            <div class="br-label">🌙 Dormir a las</div>
+            <div class="br-time" id="bt-${day.key}">${bt || '—'}</div>
+          </div>
+        </div>
+
+        <div id="nowork-${day.key}" style="${s.active ? 'display:none' : ''}">
+          <div class="no-work-msg">🛌 Día de descanso libre</div>
+        </div>
+      `;
+
+      grid.appendChild(card);
+
+      // Events
+      const toggle = card.querySelector(`#toggle-${day.key}`);
+      const wakeInput = card.querySelector(`#wake-${day.key}`);
+      const inputs = card.querySelector(`#inputs-${day.key}`);
+      const nowork = card.querySelector(`#nowork-${day.key}`);
+      const toggleLabel = card.querySelector('.work-toggle label:last-child');
+
+      toggle.addEventListener('change', () => {
+        schedule[day.key].active = toggle.checked;
+        inputs.style.display = toggle.checked ? '' : 'none';
+        nowork.style.display  = toggle.checked ? 'none' : '';
+        toggleLabel.textContent = toggle.checked ? 'Día activo' : 'Día libre';
+        save();
+        updateTonight();
+        updateCountdown();
+      });
+
+      if (wakeInput) {
+        wakeInput.addEventListener('input', () => {
+          schedule[day.key].wake = wakeInput.value;
+          const btEl = card.querySelector(`#bt-${day.key}`);
+          btEl.textContent = wakeInput.value ? bedtimeFor(wakeInput.value) : '—';
+          save();
+          updateTonight();
+          updateCountdown();
+        });
+      }
+    });
+  }
+
+  // ── Tonight card ───────────────────────────────────
+  function updateTonight() {
+    const next = getNextActiveDay();
+    const contentEl = document.getElementById('tonight-content');
+    const dayNameEl = document.getElementById('tonight-day');
+
+    if (!next) {
+      dayNameEl.textContent = '—';
+      contentEl.innerHTML = '<div class="no-schedule">No tienes ningún día activo esta semana.</div>';
+      return;
+    }
+
+    const { dayData, offsetDays } = next;
+    const s = schedule[dayData.key];
+    const wake = s.wake;
+    const bed  = bedtimeFor(wake);
+
+    const labels = ['', 'Mañana', 'Pasado mañana', 'En 3 días', 'En 4 días', 'En 5 días', 'En 6 días'];
+    const label = offsetDays === 0 ? 'Hoy' : (labels[offsetDays] || `En ${offsetDays} días`);
+    dayNameEl.textContent = `${label} — ${dayData.name}`;
+
+    contentEl.innerHTML = `
+      <div class="times-row">
+        <div class="time-block">
+          <div class="t-label">🌙 Acuéstate a las</div>
+          <div class="t-value bedtime">${bed}</div>
+        </div>
+        <div class="arrow-sep">→</div>
+        <div class="time-block">
+          <div class="t-label">☀️ Despierta a las</div>
+          <div class="t-value waketime">${wake}</div>
+        </div>
+      </div>
+      <div class="sleep-info">
+        <div class="pill green">✓ 7h 30min de sueño</div>
+        <div class="pill purple">⏱ 30min para dormirte</div>
+        <div class="pill blue">🔄 5 ciclos completos</div>
+      </div>
+    `;
+  }
+
+  // ── Countdown ──────────────────────────────────────
+  let countdownInterval = null;
+
+  function updateCountdown() {
+    const next = getNextActiveDay();
+    const section = document.getElementById('countdown-section');
+
+    if (!next) { section.style.display = 'none'; return; }
+
+    const { dayData, offsetDays } = next;
+    const s = schedule[dayData.key];
+    const bed = bedtimeFor(s.wake);
+
+    function tick() {
+      const now = new Date();
+      const bedMin = parseTime(bed);
+
+      // Build target datetime
+      const target = new Date(now);
+      target.setHours(Math.floor(bedMin / 60), bedMin % 60, 0, 0);
+
+      // If today's entry but bedtime is tomorrow (past midnight), add days to offset
+      // offsetDays = 0 means this is today's wake, so bed is tonight (possibly after midnight)
+      // If wake tomorrow, bed could be tonight or next night
+      // Simple heuristic: if target <= now, add 1 day then add offsetDays more
+      if (target <= now) target.setDate(target.getDate() + 1);
+      // If next active day is not tomorrow's wake but further, adjust
+      if (offsetDays > 1) target.setDate(target.getDate() + (offsetDays - 1));
+
+      const diff = target - now;
+      const hours   = Math.floor(diff / 3600000);
+      const minutes = Math.floor((diff % 3600000) / 60000);
+      const secs    = Math.floor((diff % 60000) / 1000);
+
+      const val = document.getElementById('countdown-value');
+      const msg = document.getElementById('countdown-msg');
+
+      if (diff <= 0) {
+        val.textContent = '¡Hora de dormir!';
+        val.style.color = '#f87171';
+        msg.textContent = '';
+      } else if (hours < 1) {
+        val.textContent = `${String(minutes).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+        val.style.color = '#f87171';
+        msg.textContent = `Menos de una hora para acostarte (${bed})`;
+      } else {
+        val.textContent = `${String(hours).padStart(2,'0')}:${String(minutes).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+        val.style.color = '#fbbf24';
+        msg.textContent = `Para acostarte a las ${bed} y despertar a las ${s.wake}`;
+      }
+
+      section.style.display = '';
+    }
+
+    if (countdownInterval) clearInterval(countdownInterval);
+    tick();
+    countdownInterval = setInterval(tick, 1000);
+  }
+
+  // ── Init ───────────────────────────────────────────
+  buildGrid();
+  updateTonight();
+  updateCountdown();
+</script>
+</body>
+</html>
